@@ -1,29 +1,53 @@
-# Triki 3D - Multijugador Online
+# Triki 3D
 
-## Como ejecutarlo en local
-1. Entra a la carpeta del proyecto.
-2. Ejecuta `npm install`.
-3. Ejecuta `npm start`.
-4. Abre `http://127.0.0.1:3000`.
+Juego web multijugador de tres en raya con estetica futurista, soporte para partidas en linea, modo local y juego contra IA. El proyecto esta construido como una aplicacion ligera servida por Express y sincronizada en tiempo real con Socket.IO.
 
-## Modos disponibles
-- En linea
-- Local
-- Contra IA
+## Resumen para portafolio
 
-## Flujo online
-1. Jugador 1 crea una sala.
-2. Comparte el codigo de 5 letras.
-3. Jugador 2 se une con ese codigo.
-4. La partida inicia en tiempo real.
+Videojuego web casual con enfoque en experiencia rapida, instalacion como PWA y sincronizacion en tiempo real entre dos jugadores. El repositorio contiene cliente, servidor y capa basica offline en una estructura compacta y facil de desplegar.
 
-## Instalacion como app
-- En PC puedes instalarla desde Chrome o Edge.
-- En Android puedes usar Agregar a pantalla de inicio.
-- En iPhone puedes usar Compartir y luego Agregar a pantalla de inicio.
+## Modos de juego
 
-## Archivos principales
-- `server.js`: servidor local con Express y Socket.IO.
-- `public/index.html`: cliente completo del juego.
+- Online con salas privadas por codigo.
+- Local en un mismo dispositivo.
+- Contra IA.
+
+## Arquitectura
+
+- `server.js`: servidor HTTP, entrega del cliente y eventos Socket.IO.
+- `public/index.html`: cliente principal del juego.
 - `public/manifest.webmanifest`: configuracion PWA.
-- `public/sw.js`: cache basica para instalacion.
+- `public/sw.js`: cache de app shell y soporte offline basico.
+
+## Stack tecnico
+
+- Node.js
+- Express
+- Socket.IO
+- HTML/CSS/JavaScript
+- PWA
+
+## Flujo multijugador
+
+1. Un jugador crea una sala.
+2. El servidor genera un codigo de cinco caracteres.
+3. El segundo jugador se une con ese codigo.
+4. El tablero se sincroniza en tiempo real para ambos clientes.
+
+## Ejecucion local
+
+```bash
+npm install
+npm start
+```
+
+URL local:
+
+- `http://127.0.0.1:3000`
+
+## Enfoque de ingenieria
+
+- Servidor unico para servir cliente y WebSocket sin capas innecesarias.
+- PWA integrada para instalacion en escritorio y moviles.
+- Codigo orientado a partida rapida y baja friccion de acceso.
+- Base apropiada para evolucionar ranking, persistencia o matchmaking.
