@@ -45,6 +45,23 @@ URL local:
 
 - `http://127.0.0.1:3000`
 
+## Publicacion
+
+URL publica esperada:
+- `https://andresito202.github.io/triki/`
+
+Compatibilidad con GitHub Pages:
+- El cliente estatico y la PWA si son compatibles.
+- El modo `online` no se publica en GitHub Pages porque depende de Express + Socket.IO.
+- En la URL publica quedan operativos `local` y `contra IA`.
+
+Despliegue:
+- `Settings -> Pages -> Build and deployment -> Source -> GitHub Actions`
+
+Notas:
+- El workflow publica directamente el contenido de `public/`.
+- Manifest, service worker e iconos quedaron ajustados para la subruta `/triki/`.
+
 ## Enfoque de ingenieria
 
 - Servidor unico para servir cliente y WebSocket sin capas innecesarias.

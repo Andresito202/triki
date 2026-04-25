@@ -8,13 +8,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Triki 3D"/>
-<link rel="manifest" href="/manifest.webmanifest"/>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
-<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
+<link rel="apple-touch-icon" href="./apple-touch-icon.png"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>Triki 3D - Multijugador</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet"/>
 <style>
@@ -470,91 +470,112 @@ const Board3D = (() => {
 
   return { init, addMark, clearMarks, showWinLine, setEnabled:(v)=>enabled=v };
 })();
-const socket = io();
+const IS_GITHUB_PAGES = window.location.hostname.endsWith('github.io');
+const REALTIME_ENABLED = !IS_GITHUB_PAGES;
+const socket = REALTIME_ENABLED && typeof io === 'function' ? io() : null;
+let needsStaticDeploySetup = false;
 
-socket.on('connect', () => {
-  document.getElementById('conn-dot').className = 'conn-dot online';
-  document.getElementById('conn-label').textContent = 'Conectado al servidor';
-});
-socket.on('disconnect', () => {
-  document.getElementById('conn-dot').className = 'conn-dot offline';
-  document.getElementById('conn-label').textContent = 'Sin conexion';
-  if (GS.mode === 'online' || GS.roomId) {
-    showToast('Se perdio la conexion con la partida', 3500);
-    resetToMenu();
-  }
-});
-socket.on('error', (msg) => {
-  if (!GS.roomId) {
-    GS.mode = null;
-    GS.mySymbol = null;
-  }
-  showToast('Aviso: ' + msg);
-});
+const setConnectionStatus = (state, text) => {
+  document.getElementById('conn-dot').className = 'conn-dot ' + state;
+  document.getElementById('conn-label').textContent = text;
+};
 
-socket.on('room_created', ({ roomId, symbol }) => {
-  GS.mode = 'online';
-  GS.mySymbol = symbol;
-  GS.roomId = roomId;
-  GS.gameOver = false;
-  document.getElementById('display-room-code').textContent = roomId;
-  showScreen('waiting');
-});
+const disableOnlineModeForStaticDeploy = () => {
+  document.getElementById('tab-online').disabled = true;
+  document.getElementById('tab-online').style.opacity = '0.45';
+  document.getElementById('tab-online').style.cursor = 'not-allowed';
+  document.getElementById('btn-create').disabled = true;
+  document.getElementById('btn-join').disabled = true;
+  document.getElementById('join-input').disabled = true;
+  setConnectionStatus('offline', 'Modo online no disponible en GitHub Pages');
+  switchTab('local');
+};
 
-socket.on('room_joined', ({ roomId, symbol }) => {
-  GS.mode = 'online';
-  GS.mySymbol = symbol;
-  GS.roomId = roomId;
-});
+if (socket) {
+  socket.on('connect', () => {
+    setConnectionStatus('online', 'Conectado al servidor');
+  });
+  socket.on('disconnect', () => {
+    setConnectionStatus('offline', 'Sin conexion');
+    if (GS.mode === 'online' || GS.roomId) {
+      showToast('Se perdio la conexion con la partida', 3500);
+      resetToMenu();
+    }
+  });
+  socket.on('error', (msg) => {
+    if (!GS.roomId) {
+      GS.mode = null;
+      GS.mySymbol = null;
+    }
+    showToast('Aviso: ' + msg);
+  });
 
-socket.on('opponent_joined', () => {
-});
+  socket.on('room_created', ({ roomId, symbol }) => {
+    GS.mode = 'online';
+    GS.mySymbol = symbol;
+    GS.roomId = roomId;
+    GS.gameOver = false;
+    document.getElementById('display-room-code').textContent = roomId;
+    showScreen('waiting');
+  });
 
-socket.on('game_start', ({ board, currentPlayer, scores }) => {
-  GS.mode = 'online'; GS.board = board; GS.currentPlayer = currentPlayer; GS.scores = scores; GS.gameOver = false;
-  Game.startOnline();
-});
+  socket.on('room_joined', ({ roomId, symbol }) => {
+    GS.mode = 'online';
+    GS.mySymbol = symbol;
+    GS.roomId = roomId;
+  });
 
-socket.on('move_made', ({ index, symbol }) => {
-  GS.board[index] = symbol;
-  Board3D.addMark(index, symbol);
-  Audio.click();
-  Fx.burst(window.innerWidth/2 + (Math.random()-.5)*100, window.innerHeight/2, symbol==='X'?'#00f5ff':'#ff2d78', 8);
-});
+  socket.on('opponent_joined', () => {
+  });
 
-socket.on('turn_change', ({ currentPlayer }) => {
-  GS.currentPlayer = currentPlayer;
-  Game.updateHUD();
-});
+  socket.on('game_start', ({ board, currentPlayer, scores }) => {
+    GS.mode = 'online'; GS.board = board; GS.currentPlayer = currentPlayer; GS.scores = scores; GS.gameOver = false;
+    Game.startOnline();
+  });
 
-socket.on('game_over', ({ winner, winCombo, scores }) => {
-  GS.scores = scores; GS.gameOver = true;
-  Board3D.setEnabled(false);
-  updateScoreUI();
-  if(winCombo) Board3D.showWinLine(winCombo);
-  setTimeout(() => {
-    if(!winner){ Audio.draw(); showModal('draw',null); }
-    else if(winner === GS.mySymbol){ Audio.win(); Fx.confetti(); Fx.burst(window.innerWidth/2,window.innerHeight/3,'#00f5ff',30); showModal('win',winner); }
-    else{ Audio.lose(); Fx.burst(window.innerWidth/2,window.innerHeight/2,'#ff2d78',30); showModal('lose',winner); }
-  }, 900);
-});
+  socket.on('move_made', ({ index, symbol }) => {
+    GS.board[index] = symbol;
+    Board3D.addMark(index, symbol);
+    Audio.click();
+    Fx.burst(window.innerWidth/2 + (Math.random()-.5)*100, window.innerHeight/2, symbol==='X'?'#00f5ff':'#ff2d78', 8);
+  });
 
-socket.on('game_restart', ({ board, currentPlayer, scores }) => {
-  GS.mode = 'online'; GS.board = board; GS.currentPlayer = currentPlayer; GS.scores = scores; GS.gameOver = false;
-  Board3D.clearMarks(); updateScoreUI(); Game.updateHUD();
-  Board3D.setEnabled(true);
-  document.getElementById('modal').classList.remove('visible');
-});
+  socket.on('turn_change', ({ currentPlayer }) => {
+    GS.currentPlayer = currentPlayer;
+    Game.updateHUD();
+  });
 
-socket.on('opponent_left', () => {
-  showToast('El oponente abandono la sala', 4000);
-  GS.gameOver = true; Board3D.setEnabled(false);
-  setTimeout(() => goMenu(), 3000);
-});
+  socket.on('game_over', ({ winner, winCombo, scores }) => {
+    GS.scores = scores; GS.gameOver = true;
+    Board3D.setEnabled(false);
+    updateScoreUI();
+    if(winCombo) Board3D.showWinLine(winCombo);
+    setTimeout(() => {
+      if(!winner){ Audio.draw(); showModal('draw',null); }
+      else if(winner === GS.mySymbol){ Audio.win(); Fx.confetti(); Fx.burst(window.innerWidth/2,window.innerHeight/3,'#00f5ff',30); showModal('win',winner); }
+      else{ Audio.lose(); Fx.burst(window.innerWidth/2,window.innerHeight/2,'#ff2d78',30); showModal('lose',winner); }
+    }, 900);
+  });
+
+  socket.on('game_restart', ({ board, currentPlayer, scores }) => {
+    GS.mode = 'online'; GS.board = board; GS.currentPlayer = currentPlayer; GS.scores = scores; GS.gameOver = false;
+    Board3D.clearMarks(); updateScoreUI(); Game.updateHUD();
+    Board3D.setEnabled(true);
+    document.getElementById('modal').classList.remove('visible');
+  });
+
+  socket.on('opponent_left', () => {
+    showToast('El oponente abandono la sala', 4000);
+    GS.gameOver = true; Board3D.setEnabled(false);
+    setTimeout(() => goMenu(), 3000);
+  });
+} else {
+  needsStaticDeploySetup = true;
+}
 const Game = {
   onCellClick(idx) {
     if(GS.mode === 'online') {
-      socket.emit('make_move', { index: idx });
+      if (socket) socket.emit('make_move', { index: idx });
     } else {
       GS.board[idx] = GS.currentPlayer;
       Board3D.addMark(idx, GS.currentPlayer);
@@ -629,7 +650,7 @@ const Game = {
 
   replay() {
     if(GS.mode==='online'){
-      socket.emit('request_replay');
+      if (socket) socket.emit('request_replay');
     } else {
       GS.reset(); Board3D.clearMarks(); this.updateHUD();
       Board3D.setEnabled(true);
@@ -698,7 +719,7 @@ const resetToMenu = () => {
 
 const leaveOnlineRoom = () => {
   if (GS.roomId) {
-    socket.emit('leave_room');
+    if (socket) socket.emit('leave_room');
   }
   resetToMenu();
 };
@@ -741,6 +762,10 @@ const copyCode = async () => {
   }
 };
 const switchTab = (tab) => {
+  if (tab === 'online' && !REALTIME_ENABLED) {
+    showToast('Modo online no disponible en GitHub Pages');
+    tab = 'local';
+  }
   document.querySelectorAll('.mode-tab').forEach(t=>t.classList.remove('active-tab'));
   document.getElementById('tab-'+tab).classList.add('active-tab');
   document.getElementById('panel-online').style.display = tab==='online'?'block':'none';
@@ -750,12 +775,26 @@ const switchTab = (tab) => {
 window.switchTab = switchTab;
 window.copyCode = copyCode;
 
+if (needsStaticDeploySetup) {
+  disableOnlineModeForStaticDeploy();
+}
+
 document.getElementById('btn-create').addEventListener('click', () => {
+  if (!REALTIME_ENABLED) {
+    showToast('Modo online no disponible en GitHub Pages');
+    switchTab('local');
+    return;
+  }
   GS.mode = 'online';
   socket.emit('create_room');
 });
 
 document.getElementById('btn-join').addEventListener('click', () => {
+  if (!REALTIME_ENABLED) {
+    showToast('Modo online no disponible en GitHub Pages');
+    switchTab('local');
+    return;
+  }
   const code = document.getElementById('join-input').value.trim().toUpperCase();
   if (code.length !== 5) { showToast('Ingresa un codigo de 5 letras'); return; }
   GS.mode='online'; GS.mySymbol='O'; socket.emit('join_room', { roomId: code });
@@ -794,7 +833,7 @@ showScreen('welcome');
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      const registration = await navigator.serviceWorker.register('./sw.js');
       if (registration.waiting) {
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
